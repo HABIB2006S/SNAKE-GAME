@@ -1,44 +1,59 @@
+
 import pygame
 import random
 
 pygame.init()
 
 WIDTH, HEIGHT = 600, 400
+BLOCK = 20
+
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Snake Pro")
+pygame.display.set_caption("Snake OOP Advanced")
+
+clock = pygame.time.Clock()
 
 GREEN = (0, 200, 0)
 RED = (200, 0, 0)
-WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-
-BLOCK = 20
-clock = pygame.time.Clock()
-font = pygame.font.SysFont(None, 35)
+WHITE = (255, 255, 255)
 
 
+# ===================== SNAKE CLASS =====================
 class Snake:
     def __init__(self):
-        self._body = [(100, 100)]
+        self._body = [(100, 100), (80, 100), (60, 100)]
         self._direction = "RIGHT"
 
-    # ===== Property =====
+    # ===== GETTER =====
     @property
     def body(self):
         return self._body
 
     @property
+    def head(self):
+        return self._body[0]
+
+    @property
     def direction(self):
         return self._direction
 
+    # ===== SETTER (مع حماية) =====
     @direction.setter
     def direction(self, value):
-        directions = ["UP", "DOWN", "LEFT", "RIGHT"]
-        if value in directions:
+        opposite = {
+            "UP": "DOWN",
+            "DOWN": "UP",
+            "LEFT": "RIGHT",
+            "RIGHT": "LEFT"
+        }
+
+        # منع الرجوع للخلف مباشرة
+        if value != opposite.get(self._direction):
             self._direction = value
 
+    # ===== MOVE =====
     def move(self):
-        x, y = self._body[0]
+        x, y = self.head
 
         if self._direction == "UP":
             y -= BLOCK
@@ -53,89 +68,120 @@ class Snake:
         self._body.insert(0, new_head)
         self._body.pop()
 
+    # ===== GROW =====
     def grow(self):
         self._body.append(self._body[-1])
 
-    def draw(self):
-        for segment in self._body:
-            pygame.draw.rect(screen, GREEN, (segment[0], segment[1], BLOCK, BLOCK))
+    # ===== DRAW =====
+    def draw(self, screen):
+        for block in self._body:
+            pygame.draw.rect(screen, GREEN, (*block, BLOCK, BLOCK))
+
+    # ===== COLLISION SELF =====
+    def check_self_collision(self):
+        return self.head in self._body[1:]
 
 
+# ===================== FOOD CLASS =====================
 class Food:
     def __init__(self):
-        self._position = self.random_pos()
+        self._position = self._random_pos()
 
+    # GETTER
     @property
     def position(self):
         return self._position
 
+    # SETTER (إعادة توليد الطعام)
     @position.setter
     def position(self, value):
         self._position = value
 
-    def random_pos(self):
-        return (random.randrange(0, WIDTH, BLOCK),
-                random.randrange(0, HEIGHT, BLOCK))
+    def _random_pos(self):
+        return (
+            random.randint(0, WIDTH // BLOCK - 1) * BLOCK,
+            random.randint(0, HEIGHT // BLOCK - 1) * BLOCK
+        )
+
+    def respawn(self):
+        self._position = self._random_pos()
+
+    def draw(self, screen):
+        pygame.draw.rect(screen, RED, (*self._position, BLOCK, BLOCK))
+
+
+# ===================== GAME CLASS =====================
+class Game:
+    def __init__(self):
+        self.snake = Snake()
+        self.food = Food()
+        self.score = 0
+        self.running = True
+
+    # ===== GETTER SCORE =====
+    @property
+    def score_value(self):
+        return self._score
+
+    # ===== SETTER SCORE =====
+    @score_value.setter
+    def score_value(self, value):
+        if value >= 0:
+            self._score = value
+
+    def update(self):
+        self.snake.move()
+
+        # تصادم مع الطعام
+        if self.snake.head == self.food.position:
+            self.snake.grow()
+            self.food.respawn()
+            self.score += 10
+
+        # تصادم مع الجدار
+        x, y = self.snake.head
+        if x < 0 or x >= WIDTH or y < 0 or y >= HEIGHT:
+            self.running = False
+
+        # تصادم مع النفس
+        if self.snake.check_self_collision():
+            self.running = False
 
     def draw(self):
-        pygame.draw.rect(screen, RED, (self._position[0], self._position[1], BLOCK, BLOCK))
-
-
-def draw_score(score):
-    text = font.render(f"Score: {score}", True, WHITE)
-    screen.blit(text, (10, 10))
-
-
-def game():
-    snake = Snake()
-    food = Food()
-    score = 0
-
-    running = True
-    while running:
         screen.fill(BLACK)
+        self.snake.draw(screen)
+        self.food.draw(screen)
 
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-
-        keys = pygame.key.get_pressed()
-        if keys[pygame.K_UP]:
-            snake.direction = "UP"
-        elif keys[pygame.K_DOWN]:
-            snake.direction = "DOWN"
-        elif keys[pygame.K_LEFT]:
-            snake.direction = "LEFT"
-        elif keys[pygame.K_RIGHT]:
-            snake.direction = "RIGHT"
-
-        snake.move()
-
-        # ===== اصطدام بالجدار =====
-        head = snake.body[0]
-        if head[0] < 0 or head[0] >= WIDTH or head[1] < 0 or head[1] >= HEIGHT:
-            print("Game Over 💀")
-            running = False
-
-        # ===== اصطدام بنفسه =====
-        if head in snake.body[1:]:
-            print("Game Over 💀")
-            running = False
-
-        # ===== أكل الطعام =====
-        if head == food.position:
-            snake.grow()
-            food.position = food.random_pos()
-            score += 1
-
-        snake.draw()
-        food.draw()
-        draw_score(score)
+        text = pygame.font.SysFont(None, 30).render(
+            f"Score: {self.score}", True, WHITE
+        )
+        screen.blit(text, (10, 10))
 
         pygame.display.update()
-        clock.tick(12)
 
-    pygame.quit()
+    def handle_keys(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                self.running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_UP:
+                    self.snake.direction = "UP"
+                elif event.key == pygame.K_DOWN:
+                    self.snake.direction = "DOWN"
+                elif event.key == pygame.K_LEFT:
+                    self.snake.direction = "LEFT"
+                elif event.key == pygame.K_RIGHT:
+                    self.snake.direction = "RIGHT"
 
 
-game()  
+# ===================== MAIN LOOP =====================
+game = Game()
+
+while game.running:
+    game.handle_keys()
+    game.update()
+    game.draw()
+    clock.tick(10)
+
+pygame.quit()
