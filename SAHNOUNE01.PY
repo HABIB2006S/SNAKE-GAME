@@ -1,85 +1,141 @@
-import turtle
-import time
+import pygame
 import random
-wn=turtle.Screen()
-wn.title("game snake_habib")
-wn.bgcolor("black")
-wn.setup(width=600,height=600)
-wn.tracer(0)
-head=turtle.Turtle()
-head.speed(0)
-head.shape("square")
-head.color("green")
-head.penup()
-head.goto(0,0)
-head.direction="stop"
 
-food=turtle.Turtle()
-food.speed(0)
-food.shape("circle")
-food.color("red")
-food.penup()
-food.goto(0,100) 
+pygame.init()
 
-segments=[]
+WIDTH, HEIGHT = 600, 400
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Snake Pro")
 
-def go_up():
-    if head.directiom != "down":
-        head.direction ="up"
-def go_down():
-    if head.direction != "up":
-        head.direction = "down"    
-def go_left():
-    if head.direction!= "right":
-        head.direction= "left"
-def go_right():
-    if head.direction!= "left":
-        head.direction= "right"
-def move():
-    if head.direction== "up":
-        y=head.ycor()
-        head.sety(y+20)
-    if head.direction=="down":
-        y=head.sety(y-20)    
-    if head.direction=="left":
-        x=head.xcor()
-        head.setx(x-20)
-    if head.direction=="right":
-        x=head.setx(x+20)
+GREEN = (0, 200, 0)
+RED = (200, 0, 0)
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
 
-wn.listen()                               
-wn.onkeypreess(go_up,"up")
-wn.onkeypreess(go_down,"down")
-wn.onkeypreess(go_left,"left")
-wn.onkeypreess(go_right,"right")
+BLOCK = 20
+clock = pygame.time.Clock()
+font = pygame.font.SysFont(None, 35)
 
-while True:
-    wn.update()
-    if head.xcor()>290 or head.xcor()<-290 or head.ycor()>290 or head.ycor()<-290:
-     time.sleep(1)
-    head.goto(0,0)
-    head.direction="stop"
-    for segment in segments:
-        segment.goto(1000,1000)
-        segment.clear()
-    if head.distance(food)< 20:
-        x=random.randint(-280,280)
-        y=random.randint(-280,280)
-        food.goto(x,y)
-        new_segment= turtle.Turtle()
-        new_segment.speed(0)
-    new_segment.shape("square")
-    new_segment.color("grey")
-    new_segment.penup()
-    segments.append(new_segment)
-    for index in range(len(segments)-1,0,1):
-        x= segments[index].xcor()
-        y= segments[index].ycor()
-        segments[index].goto(x,y)
-    if len(segments)>0:
-        x=head.xcor()
-        y=head.ycor()
-        segments[0].goto(x,y)
-    move()
-    time.sleep(0.1)
-    wn.mainloop()    
+
+class Snake:
+    def __init__(self):
+        self._body = [(100, 100)]
+        self._direction = "RIGHT"
+
+    # ===== Property =====
+    @property
+    def body(self):
+        return self._body
+
+    @property
+    def direction(self):
+        return self._direction
+
+    @direction.setter
+    def direction(self, value):
+        directions = ["UP", "DOWN", "LEFT", "RIGHT"]
+        if value in directions:
+            self._direction = value
+
+    def move(self):
+        x, y = self._body[0]
+
+        if self._direction == "UP":
+            y -= BLOCK
+        elif self._direction == "DOWN":
+            y += BLOCK
+        elif self._direction == "LEFT":
+            x -= BLOCK
+        elif self._direction == "RIGHT":
+            x += BLOCK
+
+        new_head = (x, y)
+        self._body.insert(0, new_head)
+        self._body.pop()
+
+    def grow(self):
+        self._body.append(self._body[-1])
+
+    def draw(self):
+        for segment in self._body:
+            pygame.draw.rect(screen, GREEN, (segment[0], segment[1], BLOCK, BLOCK))
+
+
+class Food:
+    def __init__(self):
+        self._position = self.random_pos()
+
+    @property
+    def position(self):
+        return self._position
+
+    @position.setter
+    def position(self, value):
+        self._position = value
+
+    def random_pos(self):
+        return (random.randrange(0, WIDTH, BLOCK),
+                random.randrange(0, HEIGHT, BLOCK))
+
+    def draw(self):
+        pygame.draw.rect(screen, RED, (self._position[0], self._position[1], BLOCK, BLOCK))
+
+
+def draw_score(score):
+    text = font.render(f"Score: {score}", True, WHITE)
+    screen.blit(text, (10, 10))
+
+
+def game():
+    snake = Snake()
+    food = Food()
+    score = 0
+
+    running = True
+    while running:
+        screen.fill(BLACK)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_UP]:
+            snake.direction = "UP"
+        elif keys[pygame.K_DOWN]:
+            snake.direction = "DOWN"
+        elif keys[pygame.K_LEFT]:
+            snake.direction = "LEFT"
+        elif keys[pygame.K_RIGHT]:
+            snake.direction = "RIGHT"
+
+        snake.move()
+
+        # ===== اصطدام بالجدار =====
+        head = snake.body[0]
+        if head[0] < 0 or head[0] >= WIDTH or head[1] < 0 or head[1] >= HEIGHT:
+            print("Game Over 💀")
+            running = False
+
+        # ===== اصطدام بنفسه =====
+        if head in snake.body[1:]:
+            print("Game Over 💀")
+            running = False
+
+        # ===== أكل الطعام =====
+        if head == food.position:
+            snake.grow()
+            food.position = food.random_pos()
+            score += 1
+
+        snake.draw()
+        food.draw()
+        draw_score(score)
+
+        pygame.display.update()
+        clock.tick(12)
+
+    pygame.quit()
+
+
+game()  
